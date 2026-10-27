@@ -1,0 +1,119 @@
+name: Build Clinic Pro APK
+
+on:
+  workflow_dispatch:        # زر تشغيل يدوي من تبويب Actions
+  push:
+    branches: [main]        # ويعمل أيضاً عند كل رفع جديد
+  pull_request:             # طلبات الدمج تُختبَر فقط (لا بناء ولا أسرار)
+
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ───────── الاختبارات أولاً: لا يُبنى APK إن فشل أي فحص ─────────
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        # flet: لاستيراد الواجهة؛ pillow: اختبارات الصور؛ cryptography: مقارنة التشفير بمرجع مستقل؛ pyflakes: فحص الشيفرة.
+        # (pillow/cryptography/pyflakes للاختبار فقط ولا تدخل في الـAPK)
+        run: pip install flet==0.28.3 pillow cryptography pyflakes
+
+      - name: Run all tests
+        run: python tests/run_all.py
+
+  build:
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # أسرار التوقيع (Settings → Secrets and variables → Actions). راجع قسم «النشر والتوقيع» في README_AR.md
+      ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      # (اختياري لكن موصى به) بصمة SHA-256 لشهادة التوقيع، كمتغير عادي Variables: يفشل البناء إن اختلف المفتاح
+      ANDROID_CERT_SHA256: ${{ vars.ANDROID_CERT_SHA256 }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup Java (required by Android build)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Release guard (no secrets in repo, public keys present)
+        run: python tools/check_release.py
+
+      - name: Prepare signing keystore
+        run: |
+          missing=""
+          for v in ANDROID_KEYSTORE_B64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [ -z "${!v}" ]; then missing="$missing $v"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::أسرار التوقيع ناقصة:$missing — بدونها يُوقَّع الـAPK بمفتاح تجريبي يتغيّر كل مرة فلا يقبل أندرويد التحديث فوق النسخة المثبّتة. راجع README_AR.md (النشر والتوقيع)."
+            exit 1
+          fi
+          echo "$ANDROID_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload-keystore.jks"
+          keytool -list -keystore "$RUNNER_TEMP/upload-keystore.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" > /dev/null
+          echo "✓ keystore صالح وكلمات المرور والـalias صحيحة"
+
+      - name: Install Flet
+        run: pip install flet==0.28.3
+
+      - name: Generate SVG icons
+        run: python make_icons.py
+
+      - name: Build APK (signed, increasing build number)
+        env:
+          FLET_ANDROID_SIGNING_KEY_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          FLET_ANDROID_SIGNING_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          flet build apk --verbose \
+            --build-number "${{ github.run_number }}" \
+            --android-signing-key-store "$RUNNER_TEMP/upload-keystore.jks" \
+            --android-signing-key-alias "$ANDROID_KEY_ALIAS"
+
+      - name: Verify APK (signature + no admin secrets inside)
+        run: |
+          python tools/check_apk.py build/apk/*.apk
+          APKSIGNER=$(ls "${ANDROID_HOME:-/usr/local/lib/android/sdk}"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1)
+          if [ -z "$APKSIGNER" ]; then
+            echo "::warning::apksigner غير موجود على المشغّل؛ تخطّيت التحقق من التوقيع"
+          else
+            for apk in build/apk/*.apk; do
+              "$APKSIGNER" verify --print-certs "$apk" | tee "$RUNNER_TEMP/cert.txt"
+              sha=$(grep -i "certificate SHA-256 digest" "$RUNNER_TEMP/cert.txt" | head -1 | awk '{print $NF}' | tr -d ':' | tr 'A-F' 'a-f')
+              echo "بصمة شهادة التوقيع (SHA-256): $sha   ← سجّلها في Variables باسم ANDROID_CERT_SHA256"
+              if [ -n "$ANDROID_CERT_SHA256" ] && [ "$sha" != "$(echo "$ANDROID_CERT_SHA256" | tr -d ':' | tr 'A-F' 'a-f')" ]; then
+                echo "::error::توقيع الـAPK لا يطابق ANDROID_CERT_SHA256 — لن يقبل أندرويد التحديث. أوقف النشر."
+                exit 1
+              fi
+            done
+          fi
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: shifa-apk
+          path: build/apk/
+          if-no-files-found: error

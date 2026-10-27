@@ -1,0 +1,23 @@
+[project]
+name = "shifa"
+version = "2.7.0"
+description = "Clinic Pro - إدارة العيادة (يعمل بدون إنترنت)"
+requires-python = ">=3.10"
+dependencies = ["flet==0.28.3"]
+# تصغير الصور وإنشاء المصغّرات يحتاج Pillow. لا تُفعّله قبل التحقق: أضف "pillow" هنا في فرع تجريبي، شغّل البناء،
+# وإن نجح ثبّت الـAPK وافتح «الإعدادات ← تشخيص الجهاز»: يجب أن يظهر «معالجة الصور (Pillow) ✓».
+# (راجع docs/PHASE0_CHECKLIST_AR.md). بدونها يعمل التطبيق كما كان مع تحميل كسول للصور الكبيرة.
+# dependencies = ["flet==0.28.3", "pillow"]
+
+[tool.flet]
+org = "sy.gftu"
+product = "Clinic Pro"
+company = "G.F.T.U."
+copyright = "Copyright (C) 2026"
+
+[tool.flet.app]
+path = "."
+# لا يُحزَم أي سرّ أو أداة مدير داخل الـAPK (CI يفحص الحزمة النهائية أيضاً عبر tools/check_apk.py)
+exclude = ["docs", "keygen.py", "admin_keys.json", "admin_keys.json.tmp", "issued_log.json", "issued_log.json.tmp",
+           "tests", "tools", ".git", ".github", "shifa_data", "run_admin.bat", "run_app.bat", "run_tests.bat",
+           "upload-keystore.jks", "keystore.jks", "key.properties"]

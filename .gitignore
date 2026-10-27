@@ -1,0 +1,22 @@
+# ── أسرار المدير: لا تُرفع أبداً ──
+admin_keys.json
+admin_keys*.json
+issued_log.json
+issued_log.json.tmp
+issued_codes.json
+
+# ── مفاتيح توقيع أندرويد ──
+*.jks
+*.keystore
+*.p12
+key.properties
+keystore.b64
+
+# ── بيانات وتوليدات محلية ──
+shifa_data/
+assets/icons/
+build/
+__pycache__/
+*.pyc
+*.shbk
+.venv/
