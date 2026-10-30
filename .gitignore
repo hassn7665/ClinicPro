@@ -1,4 +1,4 @@
-# ── أسرار المدير: لا تُرفع أبداً ──
+# ── أسرار المدير: لا تُرفع أبداً (keygen.py نفسه كود بلا أسرار ويُحفظ في Git؛ يُستثنى من الـAPK عبر pyproject) ──
 admin_keys.json
 admin_keys*.json
 issued_log.json
@@ -13,10 +13,13 @@ key.properties
 keystore.b64
 
 # ── بيانات وتوليدات محلية ──
-shifa_data/
+myclinic_data/
 assets/icons/
 build/
 __pycache__/
 *.pyc
 *.shbk
 .venv/
+
+# ── ذاكرة hypothesis المحلية ──
+.hypothesis/

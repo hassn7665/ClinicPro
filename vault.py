@@ -197,7 +197,7 @@ class Vault:
         return {k: self.h[k] for k in ("user", "salt", "iter", "wrap", "recovery", "check", "rk") if k in self.h}
 
     # ── إنشاء الحساب ──
-    def create(self, user: str, password: str, admin_box_pub: bytes, escrow: bool = True) -> str:
+    def create(self, user: str, password: str, admin_box_pub: bytes, escrow: bool = False) -> str:
         """ينشئ الحساب ويعيد «مفتاح الاسترداد» (يُعرض لصاحب الحساب مرة واحدة ليحفظه)."""
         user = " ".join((user or "").split())
         if len(user) < 3:
@@ -212,7 +212,7 @@ class Vault:
             "v": 1, "user": user, "salt": salt.hex(), "iter": PBKDF2_ITER,
             "wrap": K.seal(kek, dek, aad=b"dek").hex(),
             "recovery": K.recovery_wrap(dek, admin_box_pub).hex() if escrow else "",
-            "check": K.seal(dek, b"shifa-ok", aad=b"check").hex(),
+            "check": K.seal(dek, b"myclinic-ok", aad=b"check").hex(),
             "attempts": 0, "locked": False, "pending": None, "next_try": 0, "last_try": 0, "dbgen": 0,
         }
         self.dek = dek

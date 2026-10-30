@@ -16,7 +16,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FORBIDDEN = ["admin_keys*.json", "issued_log*.json", "issued_codes*.json", "*.jks", "*.keystore",
-             "*.p12", "key.properties", "*.shbk", "shifa_data/*", "keystore.b64"]
+             "*.p12", "key.properties", "*.shbk", "myclinic_data/*", "keystore.b64"]
 NEED_IGNORE = ["admin_keys", "*.jks", "issued_log"]
 NEED_EXCLUDE = ["keygen.py", "admin_keys.json"]
 

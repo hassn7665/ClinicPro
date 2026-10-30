@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-crypto_core.py — عمليات التشفير لتطبيق Clinic Pro (مكتبة بايثون القياسية فقط، بلا أي حزم خارجية).
+crypto_core.py — عمليات التشفير لتطبيق My Clinic (مكتبة بايثون القياسية فقط، بلا أي حزم خارجية).
 
 لماذا بلا حزم خارجية؟ لأن التطبيق يُبنى لأندرويد عبر Flet، وحزم مثل `cryptography` قد لا تتوفر
 لكل بنية. كل ما هنا مبني على hashlib/hmac/secrets، ومُتحقَّق منه بمتجهات RFC الرسمية.
@@ -57,8 +57,8 @@ _TAG = 16
 def _subkeys(key: bytes):
     if len(key) != 32:
         raise CryptoError("طول المفتاح غير صحيح")
-    return (hmac.new(key, b"shifa-enc", hashlib.sha256).digest(),
-            hmac.new(key, b"shifa-mac", hashlib.sha256).digest())
+    return (hmac.new(key, b"myclinic-enc", hashlib.sha256).digest(),
+            hmac.new(key, b"myclinic-mac", hashlib.sha256).digest())
 
 
 def _stream_xor(enc_key: bytes, nonce: bytes, data: bytes) -> bytes:
@@ -303,7 +303,7 @@ def recovery_wrap(dek: bytes, admin_box_pub: bytes) -> bytes:
     """(عند إنشاء الحساب) يعيد: E(32) ‖ sealed(DEK).  المفتاح المؤقت الخاص يُتلف فور الاستخدام."""
     e_priv, e_pub = x25519_keypair()
     shared = x25519(e_priv, admin_box_pub)
-    rk = sha256(b"shifa-rec1", shared, e_pub, admin_box_pub)
+    rk = sha256(b"myclinic-rec1", shared, e_pub, admin_box_pub)
     return e_pub + seal(rk, dek, aad=b"recovery")
 
 
@@ -320,9 +320,9 @@ def admin_reset_respond(admin_box_priv: bytes, admin_box_pub: bytes, request_cod
     r_pub = raw[-32:]
     rec = raw[5:-32]
     e_pub, sealed = rec[:32], rec[32:]
-    rk = sha256(b"shifa-rec1", x25519(admin_box_priv, e_pub), e_pub, admin_box_pub)
+    rk = sha256(b"myclinic-rec1", x25519(admin_box_priv, e_pub), e_pub, admin_box_pub)
     dek = open_sealed(rk, sealed, aad=b"recovery")          # يفشل إن لم يكن الغلاف لهذا المفتاح
-    k2 = sha256(b"shifa-reset1", x25519(admin_box_priv, r_pub), r_pub, admin_box_pub)
+    k2 = sha256(b"myclinic-reset1", x25519(admin_box_priv, r_pub), r_pub, admin_box_pub)
     reply = seal(k2, dek, aad=device + r_pub)
     return pack_code(bytes([REC_VER]) + device + reply), device.hex()
 
@@ -335,5 +335,5 @@ def reset_open(r_priv: bytes, admin_box_pub: bytes, device_id: bytes, reply_code
     if raw[1:5] != device_id:
         raise CryptoError("هذا الرمز مخصّص لجهاز آخر")
     r_pub = x25519_pub(r_priv)
-    k2 = sha256(b"shifa-reset1", x25519(r_priv, admin_box_pub), r_pub, admin_box_pub)
+    k2 = sha256(b"myclinic-reset1", x25519(r_priv, admin_box_pub), r_pub, admin_box_pub)
     return open_sealed(k2, raw[5:], aad=device_id + r_pub)

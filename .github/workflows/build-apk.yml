@@ -1,39 +1,44 @@
-name: Build Clinic Pro APK
+name: Build My Clinic APK
 
 on:
   workflow_dispatch:        # زر تشغيل يدوي من تبويب Actions
   push:
     branches: [main]        # ويعمل أيضاً عند كل رفع جديد
-  pull_request:             # طلبات الدمج تُختبَر فقط (لا بناء ولا أسرار)
+  pull_request:
+    branches: [main]        # الاختبارات فقط (لا بناء ولا توقيع)
 
 concurrency:
-  group: build-apk-${{ github.ref }}
+  group: build-apk
   cancel-in-progress: false
 
 jobs:
-  # ───────── الاختبارات أولاً: لا يُبنى APK إن فشل أي فحص ─────────
   test:
+    name: Tests (must pass before build)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
         with:
           python-version: "3.12"
 
-      - name: Install test dependencies
-        # flet: لاستيراد الواجهة؛ pillow: اختبارات الصور؛ cryptography: مقارنة التشفير بمرجع مستقل؛ pyflakes: فحص الشيفرة.
-        # (pillow/cryptography/pyflakes للاختبار فقط ولا تدخل في الـAPK)
-        run: pip install flet==0.28.3 pillow cryptography pyflakes
+      # تبعيات الاختبار فقط (لا تدخل الـAPK)، مثبّتة بالتجزئات: أي حزمة تتغير أو تُعبَث بها يفشل التثبيت
+      - name: Install test dependencies (hash-pinned)
+        run: pip install --require-hashes -r requirements-dev.lock
 
-      - name: Run all tests
-        run: python tests/run_all.py
+      - name: Lint (pyflakes)
+        run: python -m pyflakes .
+
+      - name: Run test suite
+        env:
+          HYPOTHESIS_PROFILE: ci          # اختبارات الخصائص بنتائج قابلة لإعادة الإنتاج
+        run: python tools/run_tests.py
 
   build:
-    needs: test
+    needs: test                                  # لا يبدأ البناء ولا التوقيع إلا بعد نجاح كل الاختبارات
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -47,15 +52,15 @@ jobs:
       ANDROID_CERT_SHA256: ${{ vars.ANDROID_CERT_SHA256 }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
         with:
           python-version: "3.12"
 
       - name: Setup Java (required by Android build)
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3  # v4.9.1
         with:
           distribution: temurin
           java-version: "17"
@@ -78,7 +83,7 @@ jobs:
           echo "✓ keystore صالح وكلمات المرور والـalias صحيحة"
 
       - name: Install Flet
-        run: pip install flet==0.28.3
+        run: pip install flet==0.28.3          # نفس الإصدار المقفل في requirements-dev.lock وpyproject.toml
 
       - name: Generate SVG icons
         run: python make_icons.py
@@ -112,8 +117,8 @@ jobs:
           fi
 
       - name: Upload APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
-          name: shifa-apk
+          name: myclinic-apk
           path: build/apk/
           if-no-files-found: error

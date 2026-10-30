@@ -1,0 +1,7 @@
+# تبعيات بيئة الاختبار فقط (لا تدخل الـAPK). القفل بالتجزئات: requirements-dev.lock
+# لتحديثه:  pip install pip-tools && pip-compile --generate-hashes --allow-unsafe -o requirements-dev.lock requirements-dev.in
+flet==0.28.3
+cryptography
+pillow
+hypothesis
+pyflakes

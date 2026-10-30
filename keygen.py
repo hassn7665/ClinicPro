@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-keygen.py — أداة مدير برنامج Clinic Pro (للمدير فقط — لا تضعها في التطبيق ولا ترفعها إلى GitHub).
+keygen.py — أداة مدير برنامج My Clinic (للمدير فقط — لا تضعها في التطبيق ولا ترفعها إلى GitHub).
 
 تُصدر نوعين من الأكواد:
   1) كود التفعيل / التجديد  : مرتبط بمعرّف الجهاز، لمدة شهر أو 3 أو 6 أشهر أو سنة.
@@ -14,7 +14,9 @@ keygen.py — أداة مدير برنامج Clinic Pro (للمدير فقط —
   python keygen.py log                   ← سجل ما أُصدر
   python keygen.py menu                  ← قائمة نصية (بدون واجهة رسومية)
   python keygen.py init                  ← (اختياري) توليد المفاتيح يدوياً؛ يحدث تلقائياً عند أول تشغيل
-  python keygen.py protect               ← تشفير admin_keys.json بعبارة مرور (موصى به بشدة؛ ويغيّر العبارة إن كان محمياً)
+  python keygen.py protect               ← تغيير عبارة مرور admin_keys.json (الحماية إلزامية: المفاتيح لا تُحفظ نصاً صريحاً أبداً)
+  python keygen.py shares --need 2 --total 3   ← تقسيم المفاتيح إلى أجزاء (Shamir): أي 2 من 3 تعيد المفاتيح؛ وزّعها على أماكن/أشخاص مختلفين
+  python keygen.py recover <جزء1> <جزء2> ...   ← استرجاع admin_keys.json من الأجزاء (عند ضياع الملف أو نسيان العبارة)
   python keygen.py clockfix <DEVICE_ID>  ← كود فك «قفل التاريخ» (عندما يُقفل الجهاز بسبب ضبط تاريخ خاطئ)
 
 الملفات:
@@ -24,6 +26,7 @@ keygen.py — أداة مدير برنامج Clinic Pro (للمدير فقط —
 """
 import argparse
 import getpass
+import hashlib
 import json
 import os
 import secrets
@@ -57,8 +60,38 @@ _PASS = {"v": None, "provider": None, "warned": False}
 def _write_public(sign_seed: bytes, box_priv: bytes):
     with open(PUBLIC_PY, "w", encoding="utf-8") as f:
         f.write('# -*- coding: utf-8 -*-\n"""المفاتيح العامة للمدير (آمنة للنشر). مُولَّد تلقائياً بواسطة keygen.py"""\n'
-                f'SIGN_PUB = "{K.ed_pub(sign_seed).hex()}"   # التحقق من أكواد التفعيل (Ed25519)\n'
-                f'BOX_PUB = "{K.x25519_pub(box_priv).hex()}"    # استرداد كلمة المرور (X25519)\n')
+                f'SIGN_PUB = "{K.ed_pub(sign_seed).hex()}"   # التحقق من أكواد التفعيل (Ed25519)، معرّف المفتاح 0\n'
+                f'BOX_PUB = "{K.x25519_pub(box_priv).hex()}"    # استرداد كلمة المرور (X25519)\n'
+                '# بعد تدوير مفتاح التوقيع أضف هنا: SIGN_PUBS = {1: "<المفتاح العام الجديد hex>"}  (والكود يحمل kid)\n')
+
+
+def _key_id() -> int:
+    """معرّف مفتاح التوقيع الحالي (0 = الأصلي). يُخزَّن علناً في admin_keys.json."""
+    try:
+        return int(_read_keys_file().get("kid", 0))
+    except (OSError, ValueError):
+        return 0
+
+
+def _new_pass() -> str:
+    """عبارة مرور جديدة (مع تأكيد) من: متغير البيئة، أو نافذة الواجهة الرسومية، أو الطرفية."""
+    env = os.environ.get("CLINICPRO_ADMIN_PASS")
+    if env:
+        pw = env
+    else:
+        if _PASS["provider"]:
+            ask = _PASS["provider"]
+        elif sys.stdin and sys.stdin.isatty():
+            ask = getpass.getpass
+        else:
+            raise SystemExit("مفاتيح المدير يجب أن تُحمى بعبارة مرور ولا يمكن سؤالك عنها هنا. شغّل الأداة من الطرفية "
+                             "(أو عرّف CLINICPRO_ADMIN_PASS).")
+        pw = ask(f"عبارة مرور جديدة لمفاتيح المدير ({MIN_ADMIN_PASS} خانة على الأقل — جملة طويلة أفضل): ") or ""
+        if pw != (ask("أعد كتابتها للتأكيد: ") or ""):
+            raise SystemExit("العبارتان غير متطابقتين.")
+    if len(pw) < MIN_ADMIN_PASS:
+        raise SystemExit(f"عبارة المرور قصيرة (الحد الأدنى {MIN_ADMIN_PASS} خانة — استخدم جملة).")
+    return pw
 
 
 def _current_public():
@@ -140,7 +173,7 @@ def _write_keys_file(data: dict):
     os.replace(tmp, KEYS)
 
 
-def _protected_doc(sign_seed: bytes, box_priv: bytes, passphrase: str, created: str) -> dict:
+def _protected_doc(sign_seed: bytes, box_priv: bytes, passphrase: str, created: str, kid: int = 0) -> dict:
     """مستند admin_keys.json المشفّر (المفاتيح العامة تبقى ظاهرة ليعمل ensure_keys دون عبارة المرور)."""
     if len(passphrase or "") < MIN_ADMIN_PASS:
         raise ValueError(f"عبارة المرور قصيرة (الحد الأدنى {MIN_ADMIN_PASS} خانة — استخدم جملة)")
@@ -148,14 +181,15 @@ def _protected_doc(sign_seed: bytes, box_priv: bytes, passphrase: str, created: 
     blob = K.seal(_admin_kek(passphrase, salt, ADMIN_ITER),
                   json.dumps({"sign_seed": sign_seed.hex(), "box_priv": box_priv.hex()}).encode(), aad=b"admin-keys")
     return {"v": 2, "enc": True, "salt": salt.hex(), "iter": ADMIN_ITER, "blob": blob.hex(),
-            "sign_pub": K.ed_pub(sign_seed).hex(), "box_pub": K.x25519_pub(box_priv).hex(), "created": created}
+            "sign_pub": K.ed_pub(sign_seed).hex(), "box_pub": K.x25519_pub(box_priv).hex(), "created": created,
+            "kid": kid}
 
 
 def protect_keys(passphrase: str):
     """يشفّر admin_keys.json بعبارة مرور (أو يغيّر العبارة إن كان محمياً). يتحقق من فك التشفير قبل الاستبدال."""
     sign_seed, box_priv = _load_secret()
     created = _read_keys_file().get("created") or datetime.now().isoformat(timespec="seconds")
-    doc = _protected_doc(sign_seed, box_priv, passphrase, created)
+    doc = _protected_doc(sign_seed, box_priv, passphrase, created, _key_id())
     chk = json.loads(K.open_sealed(_admin_kek(passphrase, bytes.fromhex(doc["salt"]), ADMIN_ITER),
                                    bytes.fromhex(doc["blob"]), aad=b"admin-keys"))
     if (bytes.fromhex(chk["sign_seed"]), bytes.fromhex(chk["box_priv"])) != (sign_seed, box_priv):
@@ -194,16 +228,15 @@ def ensure_keys() -> str:
 
 
 def init_keys(force=False, passphrase: str | None = None):
+    """يولّد مفاتيح جديدة. الحماية بعبارة مرور **إلزامية**: لا يُكتب أي مفتاح خاص نصاً صريحاً على القرص."""
     if os.path.exists(KEYS) and not force:
         raise SystemExit("admin_keys.json موجود مسبقاً. إعادة توليد المفاتيح تُبطل كل الأكواد الصادرة وتعطّل "
                          "استرداد كلمات المرور للحسابات القائمة. إن كنت متأكداً أضف --force")
+    passphrase = passphrase or _new_pass()
     sign_seed, box_priv = secrets.token_bytes(32), secrets.token_bytes(32)
     created = datetime.now().isoformat(timespec="seconds")
-    if passphrase:
-        _write_keys_file(_protected_doc(sign_seed, box_priv, passphrase, created))
-        _PASS["v"] = passphrase
-    else:        # التوليد التلقائي من التطبيق على حاسوب المطوّر (بلا لوحة مفاتيح): يُحمى لاحقاً بـ protect
-        _write_keys_file({"sign_seed": sign_seed.hex(), "box_priv": box_priv.hex(), "created": created})
+    _write_keys_file(_protected_doc(sign_seed, box_priv, passphrase, created))
+    _PASS["v"] = passphrase
     _write_public(sign_seed, box_priv)
     LC.reload_keys()
     return {"sign_seed": sign_seed.hex(), "box_priv": box_priv.hex(), "created": created}
@@ -212,15 +245,99 @@ def init_keys(force=False, passphrase: str | None = None):
 def load_keys():
     created = ensure_keys()
     if created != "ok":
-        print("✓ تم إنشاء مفاتيح المدير تلقائياً — احتفظ بنسخة احتياطية من admin_keys.json" if created == "created"
+        print("✓ تم إنشاء مفاتيح المدير — احتفظ بنسخة احتياطية (أجزاء Shamir: python keygen.py shares)" if created == "created"
               else "✓ تم إصلاح public_keys.py من مفتاح المدير الموجود")
-    if not keys_protected() and not _PASS["warned"]:
-        _PASS["warned"] = True
-        print("⚠ مفاتيح المدير غير محميّة بعبارة مرور (admin_keys.json نصّ صريح). شغّل: python keygen.py protect",
-              file=sys.stderr)
+    if not keys_protected():                 # ملف قديم نصّ صريح: نحميه الآن (مرة واحدة) قبل أي استعمال
+        print("⚠ admin_keys.json غير محمي: سيُشفَّر الآن بعبارة مرور.", file=sys.stderr)
+        protect_keys(_new_pass())
     secret = _load_secret()
     LC.reload_keys()
     return secret
+
+
+# ═══════════════ تقسيم المفاتيح (Shamir على GF(256)) ═══════════════
+def _gf_mul(a: int, b: int) -> int:
+    r = 0
+    while b:
+        if b & 1:
+            r ^= a
+        a <<= 1
+        if a & 0x100:
+            a ^= 0x11B
+        b >>= 1
+    return r
+
+
+def _gf_inv(a: int) -> int:
+    r = 1
+    for _ in range(254):                       # a^254 = a^-1 في GF(256)
+        r = _gf_mul(r, a)
+    return r
+
+
+def split_secret(secret: bytes, need: int, total: int) -> list:
+    """يقسم سراً إلى total جزءاً نصياً؛ أي need منها تعيده، وأقل من ذلك لا تكشف شيئاً."""
+    if not 2 <= need <= total <= 10:
+        raise ValueError("العدد المطلوب بين 2 والإجمالي، والإجمالي حتى 10")
+    data = secret + hashlib.sha256(secret).digest()[:4]         # بصمة تكشف أجزاء ناقصة/خاطئة عند الاسترجاع
+    shares = [bytearray([need, x]) for x in range(1, total + 1)]
+    for byte in data:
+        coef = [byte] + [secrets.randbelow(256) for _ in range(need - 1)]
+        for sh in shares:
+            y = 0
+            for c in reversed(coef):
+                y = _gf_mul(y, sh[1]) ^ c
+            sh.append(y)
+    return [K.pack_code(bytes(sh)) for sh in shares]
+
+
+def join_secret(codes) -> bytes:
+    try:
+        raws = [K.unpack_code(c) for c in codes]
+    except K.CryptoError as ex:
+        raise ValueError(f"جزء غير صالح: {ex}")
+    if not raws or any(len(r) != len(raws[0]) or r[0] != raws[0][0] for r in raws):
+        raise ValueError("الأجزاء ليست من مجموعة واحدة")
+    need = raws[0][0]
+    if len({r[1] for r in raws}) != len(raws):
+        raise ValueError("جزء مكرر")
+    if len(raws) < need:
+        raise ValueError(f"يلزم {need} أجزاء على الأقل (أُدخل {len(raws)})")
+    use = raws[:need]
+    xs = [r[1] for r in use]
+    out = bytearray()
+    for i in range(2, len(use[0])):
+        acc = 0
+        for j, r in enumerate(use):
+            num = den = 1
+            for m, xm in enumerate(xs):
+                if m != j:
+                    num, den = _gf_mul(num, xm), _gf_mul(den, xs[j] ^ xm)
+            acc ^= _gf_mul(r[i], _gf_mul(num, _gf_inv(den)))
+        out.append(acc)
+    secret, chk = bytes(out[:-4]), bytes(out[-4:])
+    if hashlib.sha256(secret).digest()[:4] != chk:
+        raise ValueError("الأجزاء غير متطابقة أو غير كافية")
+    return secret
+
+
+def make_shares(need: int = 2, total: int = 3) -> list:
+    sign_seed, box_priv = load_keys()
+    return split_secret(sign_seed + box_priv + bytes([_key_id()]), need, total)
+
+
+def recover_keys(codes, force=False, passphrase: str | None = None):
+    """يعيد كتابة admin_keys.json (مشفّراً بعبارة جديدة) و public_keys.py من أجزاء Shamir."""
+    sec = join_secret(codes)
+    if len(sec) != 65:
+        raise ValueError("الأجزاء لا تعود لمفاتيح مدير My Clinic")
+    sign_seed, box_priv, kid = sec[:32], sec[32:64], sec[64]
+    if os.path.exists(KEYS) and not force:
+        raise SystemExit("admin_keys.json موجود. أضف --force لاستبداله بالمسترجَع.")
+    _write_keys_file(_protected_doc(sign_seed, box_priv, passphrase or _new_pass(),
+                                    datetime.now().isoformat(timespec="seconds"), kid))
+    _write_public(sign_seed, box_priv)
+    LC.reload_keys()
 
 
 def read_log():
@@ -254,7 +371,7 @@ def issue_activation(device: str, months: int, serial: int | None = None, note: 
     serial = serial or last + 1
     if serial <= last:
         raise ValueError(f"الرقم التسلسلي {serial} ليس أحدث من آخر رقم صادر لهذا الجهاز ({last}).")
-    code = LC.make_code(sign_seed, dev, serial, months)
+    code = LC.make_code(sign_seed, dev, serial, months, kid=_key_id())
     LC.parse_code(code, dev)                                   # فحص ذاتي: يجب أن يقبله التطبيق
     rec = {"time": datetime.now().isoformat(timespec="seconds"), "kind": "activation", "device": dev,
            "serial": serial, "months": months, "note": note.strip(), "code": code}
@@ -271,7 +388,7 @@ def issue_clock_fix(device: str, note: str = "") -> dict:
     rows = read_log()
     last = max([r["serial"] for r in rows if r["kind"] in ("activation", "clockfix") and r["device"] == dev], default=0)
     serial = last + 1
-    code = LC.make_code(sign_seed, dev, serial, LC.CLOCK_FIX)
+    code = LC.make_code(sign_seed, dev, serial, LC.CLOCK_FIX, kid=_key_id())
     LC.parse_code_ex(code, dev)                                # فحص ذاتي
     rec = {"time": datetime.now().isoformat(timespec="seconds"), "kind": "clockfix", "device": dev,
            "serial": serial, "months": 0, "note": note.strip(), "code": code}
@@ -342,7 +459,7 @@ def cli_protect():
 
 def cli_menu():
     while True:
-        print("\n══ أداة مدير Clinic Pro ══\n1) كود تفعيل / تجديد\n2) رمز إعادة تعيين كلمة المرور\n3) السجل\n"
+        print("\n══ أداة مدير My Clinic ══\n1) كود تفعيل / تجديد\n2) رمز إعادة تعيين كلمة المرور\n3) السجل\n"
               "4) كود فك قفل التاريخ\n5) حماية مفاتيح المدير بعبارة مرور\n0) خروج")
         c = input("اختر: ").strip()
         try:
@@ -377,7 +494,7 @@ def cli_menu():
 
 # ═══════════════ الواجهة الرسومية ═══════════════
 def _apply_style(root, tk, ttk):
-    """هوية Clinic Pro على واجهة المدير (شكل فقط، لا يمسّ أي وظيفة)."""
+    """هوية My Clinic على واجهة المدير (شكل فقط، لا يمسّ أي وظيفة)."""
     T = TH
     root.configure(bg=T.BG)
     st = ttk.Style(root)
@@ -419,7 +536,7 @@ def gui():
     from tkinter import messagebox, ttk
 
     root = tk.Tk()
-    root.title("Clinic Pro — مدير إصدار الأكواد")
+    root.title("My Clinic — مدير إصدار الأكواد")
     root.geometry("780x720")
     font = ("Segoe UI", 11)
     _apply_style(root, tk, ttk)
@@ -437,7 +554,7 @@ def gui():
         pass
     box = tk.Frame(banner, bg=TH.MINT)
     box.pack(side="right", pady=10)
-    tk.Label(box, text="Clinic Pro", bg=TH.MINT, fg=TH.DARK, font=("Segoe UI", 18, "bold")).pack(anchor="e")
+    tk.Label(box, text="My Clinic", bg=TH.MINT, fg=TH.DARK, font=("Segoe UI", 18, "bold")).pack(anchor="e")
     tk.Label(box, text="مدير الإصدار — أكواد التفعيل وإعادة التعيين", bg=TH.MINT, fg=TH.MUTED,
              font=("Segoe UI", 10)).pack(anchor="e")
     status = ttk.Frame(root)
@@ -602,7 +719,7 @@ def gui():
 
 
 def main():
-    ap = argparse.ArgumentParser(description="أداة مدير Clinic Pro")
+    ap = argparse.ArgumentParser(description="أداة مدير My Clinic")
     sub = ap.add_subparsers(dest="cmd")
     i = sub.add_parser("init", help="توليد مفاتيح المدير (مرة واحدة)")
     i.add_argument("--force", action="store_true")
@@ -619,19 +736,21 @@ def main():
     c.add_argument("device_id")
     c.add_argument("--note", default="")
     sub.add_parser("protect", help="تشفير admin_keys.json بعبارة مرور (أو تغيير العبارة)")
+    sh = sub.add_parser("shares", help="تقسيم المفاتيح إلى أجزاء Shamir للنسخ الاحتياطي")
+    sh.add_argument("--need", type=int, default=2)
+    sh.add_argument("--total", type=int, default=3)
+    rc = sub.add_parser("recover", help="استرجاع المفاتيح من أجزاء Shamir")
+    rc.add_argument("codes", nargs="+")
+    rc.add_argument("--force", action="store_true")
     sub.add_parser("log", help="عرض السجل")
     sub.add_parser("menu", help="قائمة نصية")
     args = ap.parse_args()
     try:
         if args.cmd == "init":
-            pw = None
-            if sys.stdin and sys.stdin.isatty():
-                pw = getpass.getpass(f"عبارة مرور لحماية المفاتيح ({MIN_ADMIN_PASS} خانة على الأقل، أو Enter لتخطّي): ") or None
-                if pw and pw != getpass.getpass("أعد كتابتها: "):
-                    raise ValueError("العبارتان غير متطابقتين")
-            init_keys(args.force, pw)
-            print("✓ تم توليد المفاتيح.\n  - admin_keys.json : سرّي، احتفظ بنسخة احتياطية آمنة ولا ترفعه إلى GitHub\n"
-                  "  - public_keys.py  : ارفعه مع المشروع عند بناء التطبيق")
+            init_keys(args.force)
+            print("✓ تم توليد المفاتيح (مشفّرة بعبارة مرور).\n  - admin_keys.json : سرّي، لا ترفعه إلى GitHub\n"
+                  "  - public_keys.py  : ارفعه مع المشروع عند بناء التطبيق\n"
+                  "  - الآن: python keygen.py shares --need 2 --total 3  ← وزّع الأجزاء على أماكن مختلفة (ضياع المفاتيح = لا إصدار ولا استرداد)")
         elif args.cmd == "activate":
             print(describe(issue_activation(args.device_id, args.plan, args.serial, args.note)))
         elif args.cmd == "reset":
@@ -640,6 +759,14 @@ def main():
             print(describe(issue_clock_fix(args.device_id, args.note)))
         elif args.cmd == "protect":
             cli_protect()
+        elif args.cmd == "shares":
+            codes = make_shares(args.need, args.total)
+            print(f"أي {args.need} من هذه الأجزاء الـ{args.total} تعيد المفاتيح. وزّعها على أماكن/أشخاص مختلفين، ولا تحفظ اثنين معاً:\n")
+            for i, c in enumerate(codes, 1):
+                print(f"الجزء {i}: {c}")
+        elif args.cmd == "recover":
+            recover_keys(args.codes, args.force)
+            print("✓ استُرجعت المفاتيح وشُفّرت بعبارتك الجديدة.")
         elif args.cmd == "log":
             for rec in read_log():
                 print(rec["time"], rec["kind"], rec["device"], rec["serial"] or "-", rec["months"] or "-", rec["note"])
