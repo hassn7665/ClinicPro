@@ -156,5 +156,46 @@ class ImageCompressionTests(unittest.TestCase):
         self.assertLessEqual(len(full), len(src))
 
 
+class ReleaseToolsTests(unittest.TestCase):
+    """أدوات tools/check_release.py و tools/check_apk.py (يستدعيهما CI)."""
+
+    def _apk(self, extra=None, nested=None, manifest=True):
+        import io
+        import tempfile
+        import zipfile
+        d = tempfile.mkdtemp()
+        path = os.path.join(d, "t.apk")
+        with zipfile.ZipFile(path, "w") as z:
+            if manifest:
+                z.writestr("AndroidManifest.xml", "x")
+            for n in (extra or []):
+                z.writestr(n, "x")
+            if nested:
+                buf = io.BytesIO()
+                with zipfile.ZipFile(buf, "w") as inner:
+                    for n in nested:
+                        inner.writestr(n, "x")
+                z.writestr("assets/app/app.zip", buf.getvalue())
+        return path
+
+    def test_check_apk(self):
+        sys.path.insert(0, os.path.join(ROOT, "tools"))
+        import check_apk
+        self.assertEqual(check_apk.check(self._apk(nested=["main.py", "public_keys.py"])), 0)
+        self.assertEqual(check_apk.check(self._apk(nested=["main.py", "keygen.py"])), 1)
+        self.assertEqual(check_apk.check(self._apk(extra=["assets/admin_keys.json"])), 1)
+        self.assertEqual(check_apk.check(self._apk(extra=["x/upload-keystore.jks"])), 1)
+        self.assertEqual(check_apk.check(self._apk(manifest=False)), 1)
+
+    def test_check_release_passes_on_this_repo_layout(self):
+        import subprocess
+        r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "check_release.py")], capture_output=True, text=True,
+                           encoding="utf-8")
+        # في بيئة المطوّر قد لا يوجد public_keys.py (يُنشأ محلياً): المسموح فقط أن يكون هو سبب الفشل الوحيد
+        if r.returncode:
+            lines = [ln for ln in r.stdout.splitlines() if ln.startswith("  -")]
+            self.assertTrue(all("public_keys.py" in ln for ln in lines), r.stdout)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)
