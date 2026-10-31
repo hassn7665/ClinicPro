@@ -21,7 +21,7 @@ import vault as VT
 APP_NAME = "My Clinic"
 
 
-APP_VERSION = "2.7.0"
+APP_VERSION = "2.7.1"
 
 
 BASE = os.getenv("FLET_APP_STORAGE_DATA") or os.path.join(

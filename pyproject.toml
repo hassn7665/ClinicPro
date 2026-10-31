@@ -1,6 +1,6 @@
 [project]
 name = "my_clinic"
-version = "2.7.0"
+version = "2.7.1"
 description = "My Clinic - إدارة العيادة (يعمل بدون إنترنت)"
 requires-python = ">=3.10"
 # Pillow: ضغط الصور (أطول ضلع 1600 بكسل، JPEG جودة 80) وإنشاء المصغّرات. بدونها تُخزَّن الصور بحجمها الكامل.
