@@ -23,7 +23,7 @@ def init(log_dir: str):
     try:
         os.makedirs(log_dir, exist_ok=True)
         path = os.path.join(log_dir, "app.log")
-        lg = logging.getLogger("clinicpro")
+        lg = logging.getLogger("myclinic")
         lg.setLevel(logging.INFO)
         lg.propagate = False
         for h in list(lg.handlers):
@@ -76,7 +76,7 @@ class _ExcHandler(logging.Handler):
 
     def emit(self, record):
         try:
-            if record.exc_info and record.exc_info[1] is not None and not record.name.startswith("clinicpro"):
+            if record.exc_info and record.exc_info[1] is not None and not record.name.startswith("myclinic"):
                 log_exc("log_" + record.name.split(".")[0], record.exc_info[1])
         except Exception:
             pass

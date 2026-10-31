@@ -167,7 +167,7 @@ records_st = st.lists(st.tuples(names, blobs), max_size=6, unique_by=lambda t: t
 
 
 def write_backup(records, tag):
-    path = os.path.join(TMP, f"prop_{tag}_{os.urandom(4).hex()}.shbk")
+    path = os.path.join(TMP, f"prop_{tag}_{os.urandom(4).hex()}.mcbk")
     with C._bk_open(path) as w:
         w.add("__db__", b"\x01db-bytes")
         for n, d in records:

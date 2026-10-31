@@ -49,7 +49,7 @@ def norm_user(u: str) -> str:
 
 _COMMON = {"1234567890", "0123456789", "0987654321", "12345678910", "password12", "password123", "passw0rd12",
            "qwertyuiop", "qwerty1234", "1q2w3e4r5t", "abcdefghij", "0000000000", "1111111111", "admin12345",
-           "administrator", "clinic1234", "clinicpro1", "clinicpro12", "iloveyou12", "welcome123"}
+           "administrator", "clinic1234", "myclinic1", "myclinic12", "myclinic123", "iloveyou12", "welcome123"}
 _ROWS = "qwertyuiopasdfghjklzxcvbnm"
 
 

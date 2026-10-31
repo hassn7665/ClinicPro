@@ -18,7 +18,7 @@ assets/icons/
 build/
 __pycache__/
 *.pyc
-*.shbk
+*.mcbk
 .venv/
 
 # ── ذاكرة hypothesis المحلية ──

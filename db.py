@@ -51,7 +51,7 @@ def _serialize(conn) -> bytes:
     return b"\x02" + ("\n".join(conn.iterdump()) + f"\nPRAGMA user_version={ver};").encode("utf-8")
 
 
-DB_MAGIC = b"SHD1"
+DB_MAGIC = b"MCD1"
 
 
 class RollbackError(VaultError):
@@ -63,13 +63,13 @@ class RollbackError(VaultError):
 
 
 def _db_encode(plain: bytes, gen: int) -> bytes:
-    """SHD1 ‖ gen(8) ‖ sealed(aad="db|"+gen): الجيل ظاهر لكنه مربوط بالمصادقة فلا يمكن تعديله دون كشف."""
+    """MCD1 ‖ gen(8) ‖ sealed(aad="db|"+gen): الجيل ظاهر لكنه مربوط بالمصادقة فلا يمكن تعديله دون كشف."""
     g = struct.pack(">Q", gen)
     return DB_MAGIC + g + K.seal(VAULT.dek, plain, aad=b"db|" + g)
 
 
 def _db_decode(blob: bytes):
-    """(الجيل, القاعدة). يقرأ الصيغة القديمة (SHF1, aad=db) كجيل 0."""
+    """(الجيل, القاعدة). يقرأ الصيغة القديمة (MCF1, aad=db) كجيل 0."""
     if blob[:4] == DB_MAGIC:
         g = blob[4:12]
         return struct.unpack(">Q", g)[0], K.open_sealed(VAULT.dek, blob[12:], aad=b"db|" + g)

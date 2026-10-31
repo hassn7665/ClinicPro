@@ -75,7 +75,7 @@ def _key_id() -> int:
 
 def _new_pass() -> str:
     """عبارة مرور جديدة (مع تأكيد) من: متغير البيئة، أو نافذة الواجهة الرسومية، أو الطرفية."""
-    env = os.environ.get("CLINICPRO_ADMIN_PASS")
+    env = os.environ.get("MYCLINIC_ADMIN_PASS")
     if env:
         pw = env
     else:
@@ -85,7 +85,7 @@ def _new_pass() -> str:
             ask = getpass.getpass
         else:
             raise SystemExit("مفاتيح المدير يجب أن تُحمى بعبارة مرور ولا يمكن سؤالك عنها هنا. شغّل الأداة من الطرفية "
-                             "(أو عرّف CLINICPRO_ADMIN_PASS).")
+                             "(أو عرّف MYCLINIC_ADMIN_PASS).")
         pw = ask(f"عبارة مرور جديدة لمفاتيح المدير ({MIN_ADMIN_PASS} خانة على الأقل — جملة طويلة أفضل): ") or ""
         if pw != (ask("أعد كتابتها للتأكيد: ") or ""):
             raise SystemExit("العبارتان غير متطابقتين.")
@@ -114,13 +114,13 @@ def set_passphrase_provider(fn):
 def _ask_pass(prompt: str) -> str:
     if _PASS["provider"]:
         return _PASS["provider"](prompt) or ""
-    env = os.environ.get("CLINICPRO_ADMIN_PASS")
+    env = os.environ.get("MYCLINIC_ADMIN_PASS")
     if env:
         return env
     if sys.stdin and sys.stdin.isatty():
         return getpass.getpass(prompt)
     raise SystemExit("مفاتيح المدير محميّة بعبارة مرور ولا يمكن سؤالك عنها هنا. شغّل الأداة من الطرفية "
-                     "(أو عرّف المتغير CLINICPRO_ADMIN_PASS).")
+                     "(أو عرّف المتغير MYCLINIC_ADMIN_PASS).")
 
 
 def _read_keys_file() -> dict:

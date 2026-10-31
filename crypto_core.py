@@ -90,7 +90,7 @@ def open_sealed(key: bytes, blob: bytes, aad: bytes = b"") -> bytes:
     return _stream_xor(enc, nonce, ct)
 
 
-FILE_MAGIC = b"SHF1"
+FILE_MAGIC = b"MCF1"
 
 
 def encrypt_blob(key: bytes, data: bytes, aad: bytes = b"") -> bytes:

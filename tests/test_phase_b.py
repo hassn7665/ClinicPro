@@ -229,7 +229,7 @@ class RestoreHardeningTests(unittest.TestCase):
         raw, hdr_end, offs = self._records_offsets(path)
         self.assertGreaterEqual(len(offs), 3)
         for cut in (offs[-1][0], offs[-2][0]):                     # بلا السجل الختامي / بلا آخر ملف أيضاً
-            bad = os.path.join(self.tmp, f"cut{cut}.shbk")
+            bad = os.path.join(self.tmp, f"cut{cut}.mcbk")
             open(bad, "wb").write(raw[:cut])
             with self.assertRaises(ValueError):
                 list(C._bk_records(bad, C.VAULT.dek))
@@ -241,7 +241,7 @@ class RestoreHardeningTests(unittest.TestCase):
         path, _ = self._backup_with_files()
         raw, hdr_end, offs = self._records_offsets(path)
         a, ln = offs[1]
-        bad = os.path.join(self.tmp, "dropmid.shbk")
+        bad = os.path.join(self.tmp, "dropmid.mcbk")
         open(bad, "wb").write(raw[:a] + raw[a + ln:])
         with self.assertRaises(ValueError):
             list(C._bk_records(bad, C.VAULT.dek))
@@ -251,14 +251,14 @@ class RestoreHardeningTests(unittest.TestCase):
         path, _ = self._backup_with_files()
         raw, hdr_end, offs = self._records_offsets(path)
         a0, l0 = offs[0]
-        bad = os.path.join(self.tmp, "after_end.shbk")
+        bad = os.path.join(self.tmp, "after_end.mcbk")
         open(bad, "wb").write(raw + raw[a0:a0 + l0])
         with self.assertRaises(ValueError):
             list(C._bk_records(bad, C.VAULT.dek))
         a1, l1 = offs[1]
         a2, l2 = offs[2]
         swapped = raw[:a1] + raw[a2:a2 + l2] + raw[a1:a1 + l1] + raw[a2 + l2:]
-        bad2 = os.path.join(self.tmp, "swap.shbk")
+        bad2 = os.path.join(self.tmp, "swap.mcbk")
         open(bad2, "wb").write(swapped)
         with self.assertRaises(ValueError):                        # الترتيب جزء من البصمة
             list(C._bk_records(bad2, C.VAULT.dek))
@@ -267,7 +267,7 @@ class RestoreHardeningTests(unittest.TestCase):
         C = self.C
         path, _ = self._backup_with_files()
         raw, hdr_end, offs = self._records_offsets(path)
-        bad = os.path.join(self.tmp, "huge.shbk")
+        bad = os.path.join(self.tmp, "huge.mcbk")
         open(bad, "wb").write(raw[:hdr_end] + struct.pack(">I", 0xFFFFFFF0) + b"x" * 64)
         with self.assertRaises(ValueError):
             list(C._bk_records(bad, C.VAULT.dek))
@@ -280,14 +280,14 @@ class RestoreHardeningTests(unittest.TestCase):
         hdr = json.loads(raw[9:9 + n])
         hdr["fmt"] = 1                                             # تخفيض صيغة لتعطيل فحص الاقتطاع
         hb = json.dumps(hdr).encode()
-        bad = os.path.join(self.tmp, "downgrade.shbk")
+        bad = os.path.join(self.tmp, "downgrade.mcbk")
         open(bad, "wb").write(raw[:5] + struct.pack(">I", len(hb)) + hb + raw[9 + n:])
         with self.assertRaises(Exception):
             list(C._bk_records(bad, C.VAULT.dek))
 
     def test_legacy_v1_backup_still_restores(self):
         C = self.C
-        old = os.path.join(self.tmp, "old_v1.shbk")
+        old = os.path.join(self.tmp, "old_v1.mcbk")
         conn = C._mem["conn"]
         with C._bk_open(old, legacy=True) as w:
             w.add("__db__", C._serialize(conn))
@@ -308,7 +308,7 @@ class AdminKeysTests(unittest.TestCase):
         kg.KEYS, kg.LOG = os.path.join(self.dir, "admin_keys.json"), os.path.join(self.dir, "issued_log.json")
         kg.PUBLIC_PY = os.path.join(self.dir, "public_keys.py")
         kg._PASS.update(v=None, provider=None, warned=False)
-        os.environ["CLINICPRO_ADMIN_PASS"] = "correct horse battery staple"
+        os.environ["MYCLINIC_ADMIN_PASS"] = "correct horse battery staple"
         self._reload = LC.reload_keys
         LC.reload_keys = self._fake_reload
         self.addCleanup(self._restore)
@@ -319,7 +319,7 @@ class AdminKeysTests(unittest.TestCase):
 
     def _restore(self):
         self.LC.reload_keys = self._reload
-        os.environ.pop("CLINICPRO_ADMIN_PASS", None)
+        os.environ.pop("MYCLINIC_ADMIN_PASS", None)
         shutil.rmtree(self.dir, ignore_errors=True)
 
     def test_init_always_protected_never_plaintext(self):
@@ -333,11 +333,11 @@ class AdminKeysTests(unittest.TestCase):
         self.assertNotIn(seed.hex(), raw)
 
     def test_short_or_missing_passphrase_refused(self):
-        os.environ["CLINICPRO_ADMIN_PASS"] = "short"
+        os.environ["MYCLINIC_ADMIN_PASS"] = "short"
         with self.assertRaises(SystemExit):
             self.kg.init_keys()
         self.assertFalse(os.path.exists(self.kg.KEYS))
-        os.environ.pop("CLINICPRO_ADMIN_PASS")
+        os.environ.pop("MYCLINIC_ADMIN_PASS")
         with self.assertRaises(SystemExit):                        # بلا لوحة مفاتيح: لا حفظ نصي صامت
             self.kg.init_keys()
         self.assertFalse(os.path.exists(self.kg.KEYS))
@@ -381,7 +381,7 @@ class AdminKeysTests(unittest.TestCase):
         shares = kg.make_shares(2, 3)
         os.remove(kg.KEYS)
         os.remove(kg.PUBLIC_PY)
-        os.environ["CLINICPRO_ADMIN_PASS"] = "a brand new passphrase!"
+        os.environ["MYCLINIC_ADMIN_PASS"] = "a brand new passphrase!"
         kg._PASS["v"] = None
         kg.recover_keys([shares[2], shares[0]])
         self.assertEqual(kg._load_secret(), (seed, box))

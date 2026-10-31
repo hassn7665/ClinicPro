@@ -340,7 +340,7 @@ class LegacyEncryptedUpgradeTests(unittest.TestCase):
         make_account(C)
         C.save_patient(dict(full_name="x", gender="", age=1, residence="", phone="", job="", diseases="", notes="",
                             blood="", status="جديد"), {}, [])
-        path = os.path.join(tmp, "old.shbk")
+        path = os.path.join(tmp, "old.mcbk")
         old = legacy_db()
         with C._bk_open(path) as w:
             w.add("__db__", b"\x01" + old.serialize())
