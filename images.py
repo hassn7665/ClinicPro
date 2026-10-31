@@ -8,7 +8,7 @@ images.py — تصغير صور المرضى عند الإدخال وإنشاء 
 
 يعتمد التصغير على Pillow إن توفّر. **تجريد البيانات الوصفية (EXIF/GPS/XMP/IPTC/تعليقات) لا يعتمد عليها**: دوال strip_metadata
 بايثون صافية تعمل دائماً (JPEG وPNG وWebP)، فلا تُخزَّن إحداثيات موقع المريض حتى في بناء بلا Pillow. الوحيد الباقي من EXIF في JPEG
-هو وسم الاتجاه (Orientation) كي لا تظهر الصورة مقلوبة. لا يُضاف Pillow إلى requirements تلقائياً: راجع PHASE0_CHECKLIST_AR.md.
+هو وسم الاتجاه (Orientation) كي لا تظهر الصورة مقلوبة. Pillow مُدرجة في pyproject.toml؛ تأكد بعد التثبيت من «الإعدادات ← تشخيص الجهاز»: «معالجة الصور (Pillow) ✓».
 """
 import io
 import struct
@@ -23,7 +23,7 @@ except Exception:                                   # الحزمة غير مثب
 
 MAX_SIDE = 1600          # أكبر ضلع للصورة المحفوظة
 THUMB = 360              # أكبر ضلع للمصغّرة
-FULL_QUALITY, THUMB_QUALITY = 85, 72
+FULL_QUALITY, THUMB_QUALITY = 80, 70     # 80: فرق غير ملحوظ بصرياً وحجم أقل بنحو الربع عن 85
 MAX_PIXELS = 60_000_000  # حماية من الصور الضخمة جداً (قنبلة فك الضغط)
 
 
@@ -200,6 +200,7 @@ def process(data: bytes):
         im = Image.open(io.BytesIO(data))
         if im.width * im.height > MAX_PIXELS:
             return strip_metadata(data), None
+        small = max(im.size) <= MAX_SIDE               # الصورة أصلاً بحجم مقبول: لا نكبّرها بإعادة الترميز
         if kind == "jpeg":
             im.draft("RGB", (MAX_SIDE * 2, MAX_SIDE * 2))      # فكّ مخفَّض الدقة: أسرع وأقل ذاكرة
         im = ImageOps.exif_transpose(im)
@@ -207,6 +208,10 @@ def process(data: bytes):
         if max(im.size) > MAX_SIDE:
             im.thumbnail((MAX_SIDE, MAX_SIDE), Image.LANCZOS)
         full = _jpeg(im, FULL_QUALITY)
+        if kind == "jpeg" and small:
+            keep = strip_metadata(data)                # JPEG صغير مضغوط جيداً: نُبقي الأصل (بلا EXIF) إن كان أصغر من إعادة الترميز
+            if len(keep) <= len(full):
+                full = keep
         thumb = None
         if max(im.size) > THUMB * 1.25:
             t = im.copy()

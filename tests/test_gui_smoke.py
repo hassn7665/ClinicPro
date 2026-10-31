@@ -24,6 +24,12 @@ def build_app(width=390):
     return app
 
 
+def nav_cells(page):
+    """خلايا شريط التنقل السفلي (Container ← SafeArea ← Container ← Row)."""
+    bar = next(c for c in page.controls if getattr(c, "data", None) == "nav")
+    return bar.content.content.content.controls
+
+
 class GuiTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -55,9 +61,10 @@ class GuiTests(unittest.TestCase):
         for i in range(5):
             app.page.clean()
             app.nav_bar(0)
-            app.page.bottom_appbar.content.controls[i].on_click(None)
+            nav_cells(app.page)[i].on_click(None)
             titles.append(app.page.appbar.title.value if app.page.appbar else None)
-            self.assertIsNotNone(app.page.bottom_appbar, "الشاشات الأربع تُلفّ بـ with_nav فيظهر الشريط السفلي")
+            self.assertEqual(sum(getattr(c, "data", None) == "nav" for c in app.page.controls), 1,
+                             "الشاشات الخمس تُلفّ بـ with_nav فيظهر شريط سفلي واحد (داخل SafeArea)")
         self.assertEqual(titles[1:], ["جدول المواعيد", "الحسابات", "البحث عن مريض", "الإعدادات"])
 
     def test_all_registered_screens_exist(self):

@@ -171,6 +171,25 @@ def install(app):
             label_style=ft.TextStyle(color=MUTED, size=14), cursor_color=PRIMARY,
             content_padding=ft.padding.symmetric(vertical=16, horizontal=16), **kw)
 
+    def money_field(label, **kw):
+        """حقل مبلغ: يُقسَّم الرقم بفواصل الآلاف أثناء الكتابة (1,234,567). القيمة المقروءة تمرّ عبر C.parse_money كما هي."""
+        user_cb = kw.pop("on_change", None)
+        kw.setdefault("keyboard_type", ft.KeyboardType.NUMBER)
+        kw.setdefault("latin", True)
+        if kw.get("value"):
+            kw["value"] = C.group_amount_text(str(kw["value"]))
+        f = field(label, **kw)
+
+        def changed(e):
+            new = C.group_amount_text(f.value or "")
+            if new != (f.value or ""):
+                f.value = new
+                f.update()
+            if user_cb:
+                user_cb(e)
+        f.on_change = changed
+        return f
+
     def choice_group(label, options, value=None, on_change=None, chip_w=None, allow_none=True):
         """مجموعة خيارات بديلة عن القوائم المنسدلة: أزرار اختيار واضحة."""
         state = {"v": value}
@@ -209,9 +228,19 @@ def install(app):
                            T(lbl, 11, DEEP if act else MUTED, act)], spacing=2, tight=True,
                           horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                 expand=True, on_click=(lambda e, fn=fn: fn()), ink=True, border_radius=R_CTRL))
-        page.bottom_appbar = ft.BottomAppBar(content=ft.Row(cells, spacing=0, rtl=True), bgcolor=WHITE, height=76,
-                                             padding=ft.padding.symmetric(horizontal=8), elevation=12,
-                                             shadow_color=ft.Colors.with_opacity(0.3, DARK))
+        page.bottom_appbar = None
+        for c in list(page.controls):                          # لا نكرّر الشريط إن استُدعي مرتين
+            if getattr(c, "data", None) == "nav":
+                page.controls.remove(c)
+            elif isinstance(c, ft.SafeArea):                   # الشريط يتولى المسافة السفلية بنفسه
+                c.bottom = False
+        bar = ft.Container(
+            ft.SafeArea(ft.Container(ft.Row(cells, spacing=0, rtl=True), height=68,
+                                     padding=ft.padding.symmetric(horizontal=8, vertical=4)),
+                        top=False, left=False, right=False, bottom=True),
+            bgcolor=WHITE, data="nav",
+            shadow=ft.BoxShadow(blur_radius=14, color=ft.Colors.with_opacity(0.18, DARK), offset=ft.Offset(0, -2)))
+        page.controls.append(bar)
 
     def show(title, controls, back=None, actions=None, pad=16):
         page.clean()
@@ -222,10 +251,10 @@ def install(app):
             center_title=True, bgcolor=BG, elevation=0, toolbar_height=58, rtl=True,
             leading=icon_btn("arrow_right", "d", lambda e: back(), bg=WHITE, tip="رجوع") if back else None,
             leading_width=56, actions=(actions or []) + [ft.Container(width=6)])
-        page.add(ft.Container(
+        page.add(ft.SafeArea(ft.Container(
             ft.Column(controls, spacing=16, scroll=ft.ScrollMode.AUTO, rtl=True,
                       horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
-            padding=pad, expand=True, rtl=True))
+            padding=pad, expand=True, rtl=True), expand=True, top=False, bottom=True))
         page.update()
 
     def dlg_w():
@@ -320,8 +349,7 @@ def install(app):
 
         def add_row(name="", price="", cur=None):
             nm = field("الإجراء", value=name, expand=True)
-            pr = field("التكلفة", value=price, expand=True, keyboard_type=ft.KeyboardType.NUMBER,
-                       on_change=lambda e: refresh())
+            pr = money_field("التكلفة", value=price, expand=True, on_change=lambda e: refresh())
             chips, get_cur = cur_chips(cur, on_change=lambda c: refresh())
             r = {"name": nm, "price": pr, "cur": get_cur}
 
@@ -465,13 +493,13 @@ def install(app):
         page.appbar = None
         page.bottom_appbar = None
         page.bgcolor = BG
-        page.add(ft.Container(ft.Column(
+        page.add(ft.SafeArea(ft.Container(ft.Column(
             [ft.Container(height=18), ft.Container(logo(84), alignment=ft.alignment.center),
              T(APP_NAME, 28, DARK, True, text_align=ft.TextAlign.CENTER, rtl=False),
              T(title, 18, TEXT, True, text_align=ft.TextAlign.CENTER),
              T(sub, 13, MUTED, text_align=ft.TextAlign.CENTER)] + controls + [ft.Container(height=24)],
             spacing=12, scroll=ft.ScrollMode.AUTO, horizontal_alignment=ft.CrossAxisAlignment.STRETCH, rtl=True),
-            padding=24, expand=True, rtl=True))
+            padding=24, expand=True, rtl=True), expand=True))
         page.update()
 
     def pw_field(label, **kw):
@@ -485,4 +513,4 @@ def install(app):
             return r
         return w
 
-    app.export(width=width, lazy_tile=lazy_tile, img_ctl=img_ctl, toast=toast, T=T, card=card, tile=tile, pill=pill, fx=fx, btn=btn, icon_btn=icon_btn, sec=sec, fchip=fchip, field=field, choice_group=choice_group, nav_bar=nav_bar, show=show, dlg_w=dlg_w, dialog=dialog, dlg_btn=dlg_btn, ask_confirm=ask_confirm, duration_picker=duration_picker, conflict_text=conflict_text, cur_chips=cur_chips, items_editor=items_editor, read_pays=read_pays, ext=ext, open_url=open_url, pick=pick, ask_date=ask_date, avatar=avatar, stat_mini=stat_mini, cat_tile=cat_tile, appt_card=appt_card, info_row=info_row, fin_box=fin_box, rem_pill=rem_pill, auth_shell=auth_shell, pw_field=pw_field, with_nav=_with_nav)
+    app.export(width=width, lazy_tile=lazy_tile, img_ctl=img_ctl, toast=toast, T=T, card=card, tile=tile, pill=pill, fx=fx, btn=btn, icon_btn=icon_btn, sec=sec, fchip=fchip, field=field, money_field=money_field, choice_group=choice_group, nav_bar=nav_bar, show=show, dlg_w=dlg_w, dialog=dialog, dlg_btn=dlg_btn, ask_confirm=ask_confirm, duration_picker=duration_picker, conflict_text=conflict_text, cur_chips=cur_chips, items_editor=items_editor, read_pays=read_pays, ext=ext, open_url=open_url, pick=pick, ask_date=ask_date, avatar=avatar, stat_mini=stat_mini, cat_tile=cat_tile, appt_card=appt_card, info_row=info_row, fin_box=fin_box, rem_pill=rem_pill, auth_shell=auth_shell, pw_field=pw_field, with_nav=_with_nav)

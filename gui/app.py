@@ -8,6 +8,7 @@ gui/app.py — تجميع الواجهة: إعداد الصفحة والثيم،
   قاعدة: لا SQL ولا sqlite في أي ملف داخل gui/ — الوصول للبيانات عبر دوال core.py فقط.
 """
 import os
+import time
 from types import SimpleNamespace
 
 import flet as ft
@@ -95,6 +96,25 @@ def configure(app):
     app.picker, app.away, app.ui = picker, away, ui
 
 
+def warm_fonts(app, wait=0.5):
+    """يمنع «وميض الخط»: Flutter يحمّل خطوط التطبيق (page.fonts) بشكل غير متزامن، فتظهر أول شاشة بخط النظام ثم تتبدّل.
+    نعرض صفحة فارغة بلون الخلفية (مطابقة لشاشة البدء الأصلية) فيها نص شبه شفاف بكل عائلة خط ليبدأ تحميلها،
+    وننتظر قليلاً قبل رسم أي واجهة حقيقية."""
+    page = app.page
+    fams = list(dict.fromkeys((page.fonts or {}).keys()))
+    if not fams:
+        return
+    try:
+        page.bgcolor = BG
+        page.add(ft.Container(ft.Stack([ft.Text("أبجد هوز 0123456789", size=4, opacity=0.01, font_family=f) for f in fams]),
+                              expand=True, bgcolor=BG))
+        page.update()
+        time.sleep(wait)
+        page.clean()
+    except (AttributeError, TypeError, RuntimeError) as ex:          # تحسين شكلي: فشله لا يمنع التشغيل
+        C.LOG.log_exc("warm_fonts", ex)
+
+
 def boot(app):
     page, toast, auth_shell = app.page, app.toast, app.auth_shell
     license_screen, boot_account, config_error_screen = (
@@ -130,6 +150,7 @@ def boot(app):
 def main(page: ft.Page):
     app = App(page)
     configure(app)
+    warm_fonts(app)
     widgets.install(app)
     for m in SCREEN_MODULES:
         m.install(app)

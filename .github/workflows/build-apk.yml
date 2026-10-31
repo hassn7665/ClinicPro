@@ -94,6 +94,7 @@ jobs:
           FLET_ANDROID_SIGNING_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           flet build apk --verbose \
+            --splash-color "#EFF7F6" --splash-dark-color "#EFF7F6" \
             --build-number "${{ github.run_number }}" \
             --android-signing-key-store "$RUNNER_TEMP/upload-keystore.jks" \
             --android-signing-key-alias "$ANDROID_KEY_ALIAS"
@@ -119,6 +120,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
-          name: myclinic-apk
+          name: my-clinic-apk
           path: build/apk/
           if-no-files-found: error

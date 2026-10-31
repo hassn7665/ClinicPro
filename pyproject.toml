@@ -1,19 +1,22 @@
 [project]
-name = "myclinic"
+name = "my_clinic"
 version = "2.7.0"
 description = "My Clinic - إدارة العيادة (يعمل بدون إنترنت)"
 requires-python = ">=3.10"
-dependencies = ["flet==0.28.3"]
-# تصغير الصور وإنشاء المصغّرات يحتاج Pillow. لا تُفعّله قبل التحقق: أضف "pillow" هنا في فرع تجريبي، شغّل البناء،
-# وإن نجح ثبّت الـAPK وافتح «الإعدادات ← تشخيص الجهاز»: يجب أن يظهر «معالجة الصور (Pillow) ✓».
-# (راجع docs/PHASE0_CHECKLIST_AR.md). بدونها يعمل التطبيق كما كان مع تحميل كسول للصور الكبيرة.
-# dependencies = ["flet==0.28.3", "pillow"]
+# Pillow: ضغط الصور (أطول ضلع 1600 بكسل، JPEG جودة 80) وإنشاء المصغّرات. بدونها تُخزَّن الصور بحجمها الكامل.
+# للتحقق بعد التثبيت: «الإعدادات ← تشخيص الجهاز» يجب أن يظهر «معالجة الصور (Pillow) ✓».
+dependencies = ["flet==0.28.3", "pillow"]
 
 [tool.flet]
-org = "com.myclinic"
+org = "sy.gftu"
 product = "My Clinic"
-company = "My Clinic"
+company = "G.F.T.U."
 copyright = "Copyright (C) 2026"
+
+# شاشة البدء الأصلية: لون الخلفية يطابق خلفية التطبيق (theme.BG)، والشعار من assets/splash.png و splash_android.png
+[tool.flet.splash]
+color = "#EFF7F6"
+dark_color = "#EFF7F6"
 
 [tool.flet.app]
 path = "."

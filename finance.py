@@ -44,6 +44,18 @@ def money(v, cur=None) -> str:
     return f"{s} {CUR_SYM[cur]}" if cur else s
 
 
+def group_amount_text(s) -> str:
+    """نص مبلغ أثناء الكتابة ← نص بفواصل الآلاف (1234567 → 1,234,567). يقبل الأرقام العربية، ويُبقي أول فاصلة عشرية فقط
+    وبحد أقصى منزلتين، ويتجاهل أي حرف آخر. لا يغيّر القيمة: parse_money يعيد القيمة نفسها من النص المنسَّق."""
+    t = (s or "").translate(_DIGITS) if isinstance(s, str) else ""
+    t = "".join(ch for ch in t.replace("٫", ".").replace(",", "") if ch.isdigit() or ch == ".")
+    whole, dot, frac = t.partition(".")
+    frac = frac.replace(".", "")[:2]
+    whole = whole.lstrip("0") or ("0" if (dot or whole) else "")
+    out = f"{int(whole):,}" if whole else ""
+    return out + (("." + frac) if dot else "")
+
+
 def money_multi(d, sep=" + ") -> str:
     """مبالغ بالعملتين في نص واحد (يُخفي العملة الصفرية)."""
     parts = [money(d.get(c), c) for c in CURS if (d.get(c) or 0) != 0]

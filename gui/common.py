@@ -21,6 +21,10 @@ if not _MOBILE and os.path.exists(os.path.join(_HERE, "make_icons.py")) \
     except (ImportError, OSError) as ex:               # الأيقونات تُولَّد على حاسوب المطوّر فقط؛ الفشل غير حرج
         C.LOG.log_exc("make_icons", ex)
 
+# رابط نموذج Google Form للملاحظات والمقترحات: ضع رابطك هنا بين علامتي الاقتباس (يبدأ بـ https://).
+# إن بقي فارغاً يُبلّغ المستخدم بأن النموذج غير مضبوط بدل أن يفتح شيئاً.
+FEEDBACK_URL = "https://forms.gle/rooWuXaM5ErHa7dR8"
+
 # ───────────────────────── الهوية البصرية ─────────────────────────
 COL = dict(ICON_COLORS)
 

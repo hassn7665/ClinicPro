@@ -39,7 +39,7 @@ def install(app):
         """بحث، أو تصفّح كل المرضى (مربع البحث فارغ) بترتيب أبجدي أو زمني."""
         st = {"limit": PAGE}
         results = ft.Column(spacing=12, rtl=True)
-        box = field("الاسم أو كود المريض أو رقم الهاتف — أو اتركه فارغاً لتصفّح الكل")
+        box = field("ابحث بالاسم أو الكود أو الهاتف")
         inv = {v: k for k, v in SORTS.items()}
 
         def sort_key():
@@ -81,7 +81,7 @@ def install(app):
         box.on_change = typed
         box.on_submit = typed
         go(update=False)
-        show("البحث عن مريض", [box, sort_ui, results], back=home)
+        show("البحث عن مريض", [box, T("اترك المربع فارغاً لتصفّح كل المرضى", 12, MUTED), sort_ui, results], back=home)
 
     search_screen = _with_nav(search_screen, 3)
     app.register(search_screen=search_screen)

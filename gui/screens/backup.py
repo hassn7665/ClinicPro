@@ -112,7 +112,8 @@ def install(app):
         show("النسخ الاحتياطي", warn + [
             card(ft.Column([
                 ft.Row([tile("backup", MINT, "p", 44, 22, 14),
-                        ft.Column([T(f"نسخة تلقائية كل {C.BACKUP_EVERY_DAYS} أيام (يُحتفظ بآخر {C.KEEP_BACKUPS})", 14, TEXT, True),
+                        ft.Column([T(f"نسخة تلقائية كل {C.BACKUP_EVERY_DAYS} أيام", 14, TEXT, True),
+                                   T(f"تُحفظ آخر {C.KEEP_BACKUPS} نسخ داخل الجهاز؛ عند إنشاء نسخة جديدة تُحذف الأقدم تلقائياً", 12, MUTED),
                                    T("آخر نسخة: " + (last[:10] if last else "—"), 12, MUTED)], spacing=1, expand=True)],
                        spacing=12), info], spacing=8)),
             card(ft.Row([tile("alert", TINT_R, "r", 36, 18, 11),
@@ -122,7 +123,7 @@ def install(app):
                         spacing=12), padding=12),
             btn("نسخة جديدة وتصديرها خارج الجهاز", "share", export_now),
             btn("إنشاء نسخة الآن (داخل الجهاز)", "backup", do_backup, kind="soft"),
-            btn("استيراد نسخة من ملف (.shbk)", "upload", lambda e: pick(lambda ps: do_restore(ps[0]), images=False),
+            btn("استيراد نسخة من ملف (.mcbk)", "upload", lambda e: pick(lambda ps: do_restore(ps[0]), images=False),
                 kind="outline"),
             T("النسخ مشفّرة ولا تُفتح إلا بكلمة مرور الحساب. لنقل نسخة إلى جهاز آخر: اضغط أيقونة التنزيل بجانبها "
               "فيُنزَّل الملف إلى هاتفك، ثم انقله كأي ملف واستورده هناك.", 12, MUTED),

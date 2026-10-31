@@ -9,7 +9,7 @@ import core as C
 
 from theme import (PRIMARY, DANGER, OK, TEXT, MUTED, MINT, TINT_R, TINT_G, TINT_A, TINT_B)
 from core import (APP_NAME, APP_VERSION)
-from gui.common import (ic)
+from gui.common import (ic, FEEDBACK_URL)
 
 
 def install(app):
@@ -40,6 +40,17 @@ def install(app):
     def lock_now(*a, **k):
         return app.s.lock_now(*a, **k)
 
+    def open_feedback(e=None):
+        """يفتح نموذج الملاحظات والمقترحات (Google Form) في المتصفح. التطبيق يعمل دون اتصال، فهذا الزر الوحيد الذي يحتاج إنترنت."""
+        url = (FEEDBACK_URL or "").strip()
+        if not url.lower().startswith("https://"):
+            return toast("نموذج الملاحظات غير مضبوط بعد في هذه النسخة", DANGER)
+        try:
+            open_url(url)
+        except Exception as ex:                          # حدّ الواجهة: نسجّل ونُبلغ
+            C.LOG.log_exc("open_feedback", ex)
+            toast("تعذّر فتح النموذج. تأكد من الاتصال بالإنترنت", DANGER)
+
     def settings_screen():
         st, days = C.lic_status()
         last = C.jload(C.SET_PATH, {}).get("last_backup")
@@ -59,6 +70,8 @@ def install(app):
             item("chart", TINT_B, "b", "الإحصائيات", "المرضى والعمليات والمراجعات", lambda e: stats_screen()),
             item("pulse", TINT_A, "a", "تشخيص الجهاز", "فحوص ذاتية وتقرير للدعم الفني وتحسين الصور",
                  lambda e: diagnostics_screen()),
+            item("share", TINT_B, "b", "تقديم الملاحظات والمقترحات", "يفتح نموذجاً في المتصفح (يتطلب إنترنت)",
+                 open_feedback),
             card(ft.Row([tile("info", MINT, "p", 44, 22, 14),
                          ft.Column([T(APP_NAME, 16, TEXT, True, rtl=False), T(f"الإصدار {APP_VERSION}", 12, MUTED)],
                                    spacing=1, expand=True)], spacing=16), padding=16),
@@ -89,7 +102,7 @@ def install(app):
 
         def export(e):
             try:
-                open_url(C.share_text(f"clinicpro_diag_{datetime.now():%Y%m%d_%H%M}.txt", st["report"]))
+                open_url(C.share_text(f"myclinic_diag_{datetime.now():%Y%m%d_%H%M}.txt", st["report"]))
                 toast("سيُفتح المتصفح لتنزيل التقرير؛ أرسله للمطوّر")
             except Exception as ex:
                 toast(f"تعذّر التصدير: {ex}", DANGER)

@@ -26,6 +26,7 @@ def install(app):
     sec = app.sec
     fchip = app.fchip
     field = app.field
+    money_field = app.money_field
     show = app.show
     dlg_w = app.dlg_w
     dialog = app.dialog
@@ -175,8 +176,7 @@ def install(app):
 
         def pay(ev):
             _, _, rem = C.amounts(ev)
-            fs = {c: field(PAY_LBL[c], value=C.money(rem[c]) if rem[c] > 0 else "",
-                           keyboard_type=ft.KeyboardType.NUMBER) for c in C.CURS}
+            fs = {c: money_field(PAY_LBL[c], value=C.money(rem[c]) if rem[c] > 0 else "") for c in C.CURS}
             note = field("ملاحظة (اختياري)")
             err = T("", 12, DANGER, True)
 
@@ -200,7 +200,7 @@ def install(app):
                          [dlg_btn("حفظ", save, "ok"), dlg_btn("إلغاء", lambda e: page.close(dlg))])
 
         def edit_pay(pm):
-            amt = field("المبلغ", value=C.money(pm["amount"]), keyboard_type=ft.KeyboardType.NUMBER)
+            amt = money_field("المبلغ", value=C.money(pm["amount"]))
             chips, get_cur = cur_chips(pm["cur"])
             note = field("ملاحظة (اختياري)", value=pm["note"] or "")
             err = T("", 12, DANGER, True)

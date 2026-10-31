@@ -12,6 +12,7 @@ from gui.when_picker import WhenPicker
 def confirm_event_dialog(ctx, ev):
     a = ctx.app
     T, btn, field = a.T, a.btn, a.field
+    money_field = a.money_field
     notes = field("ملاحظات (اختياري)", multiline=True, min_lines=2)
     extra = []
     follow = {"on": False}
@@ -28,7 +29,7 @@ def confirm_event_dialog(ctx, ev):
 
     _, paid_before, _ = C.amounts(C.ev_fin(ev["id"]))
     ed_ui, collect, total = a.items_editor(C.ev_items(ev["id"]))
-    pay_fs = {c: field(PAY_LBL[c], keyboard_type=ft.KeyboardType.NUMBER, hint_text="0") for c in C.CURS}
+    pay_fs = {c: money_field(PAY_LBL[c], hint_text="0") for c in C.CURS}
     pay_err = T("", 12, DANGER, True)
 
     def pay_all(e):
