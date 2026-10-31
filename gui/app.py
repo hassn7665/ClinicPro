@@ -106,7 +106,7 @@ def warm_fonts(app, wait=0.5):
         return
     try:
         page.bgcolor = BG
-        page.add(ft.Container(ft.Stack([ft.Text("أبجد هوز 0123456789", size=4, opacity=0.01, font_family=f) for f in fams]),
+        page.add(ft.Container(ft.Stack([DigitText("أبجد هوز 0123456789", size=4, opacity=0.01, font_family=f) for f in fams]),
                               expand=True, bgcolor=BG))
         page.update()
         time.sleep(wait)
